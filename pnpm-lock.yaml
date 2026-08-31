@@ -76,27 +76,7 @@ importers:
         specifier: 0.1.0-rc.8
         version: 0.1.0-rc.8(91dd418d886f7ce71975c2c780d46f54)
 
-  plugins/calibre-library-tools:
-    dependencies:
-      '@pirate-608/dsh-plugin-kit':
-        specifier: workspace:^
-        version: link:../../packages/plugin-kit
-    devDependencies:
-      '@deepseek-ai/dsh':
-        specifier: 0.1.0-rc.8
-        version: 0.1.0-rc.8(91dd418d886f7ce71975c2c780d46f54)
-
-  plugins/everything-search:
-    dependencies:
-      '@pirate-608/dsh-plugin-kit':
-        specifier: workspace:^
-        version: link:../../packages/plugin-kit
-    devDependencies:
-      '@deepseek-ai/dsh':
-        specifier: 0.1.0-rc.8
-        version: 0.1.0-rc.8(91dd418d886f7ce71975c2c780d46f54)
-
-  plugins/latex-workflows:
+  plugins/comfy-local-tools:
     dependencies:
       '@pirate-608/dsh-plugin-kit':
         specifier: workspace:^
@@ -216,26 +196,6 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
-
-  plugins/zju-learning-tools:
-    dependencies:
-      '@pirate-608/dsh-plugin-kit':
-        specifier: workspace:^
-        version: link:../../packages/plugin-kit
-    devDependencies:
-      '@deepseek-ai/dsh':
-        specifier: 0.1.0-rc.8
-        version: 0.1.0-rc.8(91dd418d886f7ce71975c2c780d46f54)
-
-  plugins/zotero-mcp:
-    dependencies:
-      '@pirate-608/dsh-plugin-kit':
-        specifier: workspace:^
-        version: link:../../packages/plugin-kit
-    devDependencies:
-      '@deepseek-ai/dsh':
-        specifier: 0.1.0-rc.8
-        version: 0.1.0-rc.8(91dd418d886f7ce71975c2c780d46f54)
 
 packages:
 

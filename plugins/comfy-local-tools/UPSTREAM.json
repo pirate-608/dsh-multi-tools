@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "name": "comfy-mcp",
+      "repository": "https://github.com/Comfy-Org/comfy-mcp",
+      "distribution": "User-installed uv tool",
+      "version_policy": "Not bundled or pinned; users update deliberately and re-run the protocol probe"
+    },
+    {
+      "name": "comfy-cli",
+      "documentation": "https://docs.comfy.org/agent-tools/cli",
+      "distribution": "User-installed uv tool",
+      "minimum_version": "1.14.0",
+      "version_policy": "Not bundled; local installation is resolved at runtime"
+    }
+  ],
+  "vendored_upstream_code": false,
+  "vendored_models": false
+}

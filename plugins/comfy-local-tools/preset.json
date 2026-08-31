@@ -1,0 +1,121 @@
+{
+  "id": "comfy-local",
+  "name": "Comfy Local",
+  "description": "Inspect, validate, and run workflows on a local ComfyUI or Comfy Desktop instance.",
+  "providerName": "comfy-local-skills",
+  "platform": "win32",
+  "mcpServers": [
+    {
+      "id": "comfy-local-mcp",
+      "serverName": "comfy_local",
+      "command": "powershell.exe",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "./scripts/start-comfy-mcp.ps1"
+      ],
+      "env": {},
+      "cwd": ".",
+      "toolCallTimeoutMs": 900000,
+      "failOnStartupError": true
+    }
+  ],
+  "policy": {
+    "serverNames": [
+      "comfy_local"
+    ],
+    "readOnly": [
+      "mcp__comfy_local__server_info",
+      "mcp__comfy_local__system_stats",
+      "mcp__comfy_local__nodes",
+      "mcp__comfy_local__discover",
+      "mcp__comfy_local__search_models",
+      "mcp__comfy_local__search_templates",
+      "mcp__comfy_local__get_template",
+      "mcp__comfy_local__fetch_template",
+      "mcp__comfy_local__validate_workflow",
+      "mcp__comfy_local__job",
+      "mcp__comfy_local__get_logs",
+      "mcp__comfy_local__which",
+      "mcp__comfy_local__workflow_deps",
+      "mcp__comfy_local__node_dependencies",
+      "mcp__comfy_local__list_workflow_slots"
+    ],
+    "ask": [
+      "mcp__comfy_local__generate_image",
+      "mcp__comfy_local__run_template",
+      "mcp__comfy_local__run_workflow",
+      "mcp__comfy_local__vary_workflow",
+      "mcp__comfy_local__fetch_outputs",
+      "mcp__comfy_local__upload_file",
+      "mcp__comfy_local__set_workflow_slot",
+      "mcp__comfy_local__launch_comfyui",
+      "mcp__comfy_local__restart_comfyui",
+      "mcp__comfy_local__stop_comfyui",
+      "mcp__comfy_local__free_memory",
+      "mcp__comfy_local__install_node",
+      "mcp__comfy_local__download_model",
+      "mcp__comfy_local__update_comfyui",
+      "mcp__comfy_local__switch_comfyui_version",
+      "mcp__comfy_local__partner_generate"
+    ],
+    "deny": []
+  },
+  "runtime": {
+    "install": {
+      "command": "powershell.exe",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "./scripts/install-comfy-tools.ps1"
+      ],
+      "cwd": "."
+    },
+    "status": {
+      "command": "powershell.exe",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "./scripts/diagnose-comfy-local.ps1"
+      ],
+      "cwd": "."
+    }
+  },
+  "doctor": [
+    {
+      "label": "Node.js",
+      "command": "node",
+      "args": [
+        "--version"
+      ]
+    },
+    {
+      "label": "PowerShell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-Command",
+        "$PSVersionTable.PSVersion.ToString()"
+      ]
+    },
+    {
+      "label": "uv",
+      "command": "uv",
+      "args": [
+        "--version"
+      ]
+    }
+  ],
+  "commandName": "dsh-comfy-local-tools"
+}

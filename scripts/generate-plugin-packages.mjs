@@ -1,89 +1,53 @@
-/** Generate the mechanically identical package shells around migrated content. */
+/** Generate package shells for the curated multimodal integration set. */
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const root = new URL('../', import.meta.url)
-
 const commonDoctor = (extra = []) => [{ label: 'Node.js', command: 'node', args: ['--version'] }, ...extra]
 const mcp = (id, serverName, command, args, options = {}) => ({
-  id,
-  serverName,
-  command,
-  args,
-  env: options.env ?? {},
-  cwd: options.cwd ?? '',
+  id, serverName, command, args,
+  env: options.env ?? {}, cwd: options.cwd ?? '',
   toolCallTimeoutMs: options.toolCallTimeoutMs ?? 300000,
   failOnStartupError: true,
 })
-const policy = (serverName, readOnly = [], ask = [], deny = []) => ({
-  serverNames: [serverName], readOnly, ask, deny,
-})
+const policy = (serverName, readOnly = [], ask = [], deny = []) => ({ serverNames: [serverName], readOnly, ask, deny })
 
 const packages = [
   {
-    dir: 'everything-search', slug: 'everything-search', private: false, license: 'MIT',
-    description: 'Fast local Windows file search through Everything and ES',
+    dir: 'comfy-local-tools', slug: 'comfy-local-tools', private: false, license: 'MIT',
+    description: 'Local-first ComfyUI generation and workflow automation through first-party MCP and CLI tools',
     preset: {
-      id: 'everything-search', name: 'Everything Search', description: 'Local Windows file discovery with Everything.',
-      providerName: 'everything-search-skills', platform: 'win32',
-      doctor: commonDoctor([{ label: 'Everything ES CLI', command: 'es.exe', args: ['-version'] }]),
-    },
-  },
-  {
-    dir: 'latex-workflows', slug: 'latex-workflows', private: true, license: 'UNLICENSED',
-    description: 'LaTeX compile, inspection, and PDF verification workflows',
-    preset: {
-      id: 'latex-workflows', name: 'LaTeX Workflows', description: 'Compile and validate LaTeX documents.',
-      providerName: 'latex-workflows-skills',
-      doctor: commonDoctor([
-        { label: 'Tectonic', command: 'tectonic', args: ['--version'], optional: true },
-        { label: 'pdfLaTeX', command: 'pdflatex', args: ['--version'], optional: true },
+      id: 'comfy-local', name: 'Comfy Local', description: 'Inspect, validate, and run workflows on a local ComfyUI or Comfy Desktop instance.',
+      providerName: 'comfy-local-skills', platform: 'win32',
+      mcpServers: [mcp('comfy-local-mcp', 'comfy_local', 'powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', './scripts/start-comfy-mcp.ps1'], { cwd: '.', toolCallTimeoutMs: 900000 })],
+      policy: policy('comfy_local', [
+        'mcp__comfy_local__server_info', 'mcp__comfy_local__system_stats', 'mcp__comfy_local__nodes',
+        'mcp__comfy_local__discover', 'mcp__comfy_local__search_models', 'mcp__comfy_local__search_templates',
+        'mcp__comfy_local__get_template', 'mcp__comfy_local__fetch_template', 'mcp__comfy_local__validate_workflow',
+        'mcp__comfy_local__job', 'mcp__comfy_local__get_logs', 'mcp__comfy_local__which',
+        'mcp__comfy_local__workflow_deps', 'mcp__comfy_local__node_dependencies', 'mcp__comfy_local__list_workflow_slots',
+      ], [
+        'mcp__comfy_local__generate_image', 'mcp__comfy_local__run_template', 'mcp__comfy_local__run_workflow',
+        'mcp__comfy_local__vary_workflow', 'mcp__comfy_local__fetch_outputs', 'mcp__comfy_local__upload_file',
+        'mcp__comfy_local__set_workflow_slot', 'mcp__comfy_local__launch_comfyui', 'mcp__comfy_local__restart_comfyui',
+        'mcp__comfy_local__stop_comfyui', 'mcp__comfy_local__free_memory', 'mcp__comfy_local__install_node',
+        'mcp__comfy_local__download_model', 'mcp__comfy_local__update_comfyui', 'mcp__comfy_local__switch_comfyui_version',
+        'mcp__comfy_local__partner_generate',
       ]),
-    },
-  },
-  {
-    dir: 'zotero-mcp', slug: 'zotero-mcp', private: false, license: 'MIT',
-    description: 'Local Zotero research and semantic-search agent preset',
-    preset: {
-      id: 'zotero', name: 'Zotero Research', description: 'Research and safely organize a local Zotero library.',
-      providerName: 'zotero-skills',
-      mcpServers: [mcp('zotero-mcp', 'zotero', 'uvx', ['--from', 'zotero-mcp-server[semantic,pdf]==0.9.1', 'zotero-mcp-server', 'serve', '--transport', 'stdio'], {
-        env: {
-          ZOTERO_LOCAL: 'true', ZOTERO_MCP_TOOLSETS: 'libraries,search-admin,pdf-geometry,discovery',
-          ZOTERO_EMBEDDING_MODEL: 'ollama', OLLAMA_EMBEDDING_MODEL: 'bge-m3:latest', OLLAMA_BASE_URL: 'http://127.0.0.1:11434',
-        },
-      })],
-      policy: policy('zotero', [
-        'mcp__zotero__zotero_search_items', 'mcp__zotero__zotero_semantic_search',
-        'mcp__zotero__zotero_get_search_database_status', 'mcp__zotero__zotero_export_bibliography',
-      ], ['mcp__zotero__zotero_update_search_database']),
-      doctor: commonDoctor([{ label: 'uvx', command: 'uvx', args: ['--version'] }]),
-    },
-  },
-  {
-    dir: 'calibre-library-tools', slug: 'calibre-library-tools', private: false, license: 'MIT',
-    description: 'Calibre library reading, analysis, and XPath workflows',
-    preset: {
-      id: 'calibre-library', name: 'Calibre Library', description: 'Read and analyze a Calibre library with writes disabled by default.',
-      providerName: 'calibre-library-skills',
-      mcpServers: [mcp('calibre-mcp', 'calibre', 'npx', ['-y', 'calibre-mcp@0.7.2'], {
-        env: { CALIBRE_MCP_SERVER_URL: 'http://127.0.0.1:8080', CALIBRE_MCP_ENABLE_WRITE: '0' },
-      })],
-      policy: policy('calibre', [
-        'mcp__calibre__calibre_ping', 'mcp__calibre__calibre_list_libraries', 'mcp__calibre__calibre_search',
-        'mcp__calibre__calibre_get_book', 'mcp__calibre__calibre_get_content', 'mcp__calibre__calibre_get_figures',
-        'mcp__calibre__calibre_list_categories', 'mcp__calibre__calibre_find_duplicates', 'mcp__calibre__calibre_quality_report',
-      ], ['mcp__calibre__calibre_build_index']),
-      doctor: commonDoctor([{ label: 'npx', command: 'npx', args: ['--version'] }]),
+      runtime: {
+        install: { command: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', './scripts/install-comfy-tools.ps1'], cwd: '.' },
+        status: { command: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', './scripts/diagnose-comfy-local.ps1'], cwd: '.' },
+      },
+      doctor: commonDoctor([{ label: 'PowerShell', command: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'] }, { label: 'uv', command: 'uv', args: ['--version'] }]),
     },
   },
   {
     dir: 'adobe-after-effects', slug: 'after-effects', private: true, license: 'UNLICENSED',
     description: 'Adobe After Effects automation through ae-mcp',
     preset: {
-      id: 'after-effects', name: 'After Effects', description: 'Inspect and automate Adobe After Effects.',
-      providerName: 'after-effects-skills', platform: 'win32',
+      id: 'after-effects', name: 'After Effects', description: 'Inspect and automate Adobe After Effects.', providerName: 'after-effects-skills', platform: 'win32',
       mcpServers: [mcp('after-effects-mcp', 'after_effects', 'powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', './scripts/start-ae-mcp.ps1'], { cwd: '.' })],
       policy: policy('after_effects', ['mcp__after_effects__ae_get_project_info', 'mcp__after_effects__ae_get_active_composition']),
       runtime: {
@@ -97,8 +61,7 @@ const packages = [
     dir: 'adobe-photoshop', slug: 'photoshop', private: true, license: 'UNLICENSED',
     description: 'Adobe Photoshop automation through a local COM MCP bridge',
     preset: {
-      id: 'photoshop', name: 'Photoshop', description: 'Inspect and edit Adobe Photoshop documents.',
-      providerName: 'photoshop-skills', platform: 'win32',
+      id: 'photoshop', name: 'Photoshop', description: 'Inspect and edit Adobe Photoshop documents.', providerName: 'photoshop-skills', platform: 'win32',
       mcpServers: [mcp('photoshop-mcp', 'photoshop', 'powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', './scripts/start-photoshop-mcp.ps1'], { cwd: '.' })],
       policy: policy('photoshop', ['mcp__photoshop__photoshop_get_session_info']),
       runtime: {
@@ -112,16 +75,10 @@ const packages = [
     dir: 'adobe-premiere', slug: 'premiere', private: true, license: 'UNLICENSED',
     description: 'Adobe Premiere Pro automation through a bundled CEP MCP bridge',
     preset: {
-      id: 'premiere', name: 'Premiere Pro', description: 'Inspect and edit Adobe Premiere Pro projects.',
-      providerName: 'premiere-skills', platform: 'win32',
+      id: 'premiere', name: 'Premiere Pro', description: 'Inspect and edit Adobe Premiere Pro projects.', providerName: 'premiere-skills', platform: 'win32',
       mcpServers: [mcp('premiere-mcp', 'premiere_pro', 'node', ['./scripts/start-premiere-mcp.cjs'], { cwd: '.' })],
-      policy: policy('premiere_pro', [
-        'mcp__premiere_pro__get_project_info', 'mcp__premiere_pro__list_sequences',
-        'mcp__premiere_pro__get_active_sequence', 'mcp__premiere_pro__list_project_items',
-      ]),
-      runtime: {
-        install: { command: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', './scripts/install-premiere-bridge.ps1'], cwd: '.' },
-      },
+      policy: policy('premiere_pro', ['mcp__premiere_pro__get_project_info', 'mcp__premiere_pro__list_sequences', 'mcp__premiere_pro__get_active_sequence', 'mcp__premiere_pro__list_project_items']),
+      runtime: { install: { command: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', './scripts/install-premiere-bridge.ps1'], cwd: '.' } },
       doctor: commonDoctor([]),
     },
   },
@@ -129,15 +86,10 @@ const packages = [
     dir: 'autocad-mcp', slug: 'autocad-mcp', private: true, license: 'UNLICENSED',
     description: 'AutoCAD and headless DXF automation through a text-first MCP preset',
     preset: {
-      id: 'autocad', name: 'AutoCAD', description: 'Automate AutoCAD with text-first evidence and explicit approvals.',
-      providerName: 'autocad-skills', platform: 'win32',
-      mcpServers: [mcp('autocad-mcp', 'autocad', 'uv', ['run', '--project', './vendor/autocad-mcp', 'python', '-m', 'autocad_mcp'], {
-        cwd: '.', env: { AUTOCAD_MCP_BACKEND: 'auto', AUTOCAD_MCP_IPC_DIR: 'C:/temp/dsh-autocad-mcp', AUTOCAD_MCP_IPC_TIMEOUT: '30', AUTOCAD_MCP_ONLY_TEXT: 'true' },
-      })],
+      id: 'autocad', name: 'AutoCAD', description: 'Automate AutoCAD with text-first evidence and explicit approvals.', providerName: 'autocad-skills', platform: 'win32',
+      mcpServers: [mcp('autocad-mcp', 'autocad', 'uv', ['run', '--project', './vendor/autocad-mcp', 'python', '-m', 'autocad_mcp'], { cwd: '.', env: { AUTOCAD_MCP_BACKEND: 'auto', AUTOCAD_MCP_IPC_DIR: 'C:/temp/dsh-autocad-mcp', AUTOCAD_MCP_IPC_TIMEOUT: '30', AUTOCAD_MCP_ONLY_TEXT: 'true' } })],
       policy: policy('autocad'),
-      runtime: {
-        install: { command: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', './scripts/install.ps1'], cwd: '.' },
-      },
+      runtime: { install: { command: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', './scripts/install.ps1'], cwd: '.' } },
       doctor: commonDoctor([{ label: 'uv', command: 'uv', args: ['--version'] }]),
     },
   },
@@ -145,8 +97,7 @@ const packages = [
     dir: 'solidworks-automation', slug: 'solidworks-automation', private: false, license: 'MIT',
     description: 'SolidWorks COM and MCP automation workflows',
     preset: {
-      id: 'solidworks', name: 'SolidWorks', description: 'Automate SolidWorks parts, assemblies, drawings, and review.',
-      providerName: 'solidworks-skills', platform: 'win32',
+      id: 'solidworks', name: 'SolidWorks', description: 'Automate SolidWorks parts, assemblies, drawings, and review.', providerName: 'solidworks-skills', platform: 'win32',
       mcpServers: [mcp('solidworks-mcp', 'solidworks', 'python', ['./mcp-server/server.py'], { cwd: './skills/solidworks-automation' })],
       policy: policy('solidworks', ['mcp__solidworks__solidworks_health_check', 'mcp__solidworks__solidworks_inspect_hole_features', 'mcp__solidworks__solidworks_inspect_motion_studies']),
       doctor: commonDoctor([{ label: 'Python', command: 'python', args: ['--version'] }]),
@@ -156,50 +107,15 @@ const packages = [
     dir: 'renpy-visual-novel-dev', slug: 'renpy-visual-novel-dev', private: false, license: 'AGPL-3.0-only',
     description: 'RenPy development, preview, testing, and asset-integration workflows',
     preset: {
-      id: 'renpy', name: 'RenPy Development', description: 'Develop and validate an explicit RenPy project root.',
-      providerName: 'renpy-skills',
+      id: 'renpy', name: 'RenPy Development', description: 'Develop and validate an explicit RenPy project root.', providerName: 'renpy-skills',
       mcpServers: [
         mcp('renpy-mcp', 'renpy', 'uv', ['run', '--project', './vendor/renpy-mcp', 'python', './scripts/start_renpy_mcp.py'], { cwd: '.', env: { RENPY_MCP_TIERS: '1,2,3' } }),
         mcp('renforge-mcp', 'renforge', 'uvx', ['renforge@0.7.0', 'serve'], { cwd: '.', toolCallTimeoutMs: 300000 }),
       ],
       policy: { serverNames: ['renpy', 'renforge'], readOnly: [], ask: [], deny: [] },
-      runtime: {
-        install: { command: 'uv', args: ['sync', '--project', './vendor/renpy-mcp', '--frozen'], cwd: '.' },
-      },
+      runtime: { install: { command: 'uv', args: ['sync', '--project', './vendor/renpy-mcp', '--frozen'], cwd: '.' } },
       doctor: commonDoctor([{ label: 'uv', command: 'uv', args: ['--version'] }, { label: 'uvx', command: 'uvx', args: ['--version'] }]),
     },
-  },
-  {
-    dir: 'zju-learning-tools', slug: 'zju-learning-tools', private: false, license: 'MIT',
-    description: 'Read and separately approve bounded ZJU learning operations',
-    preset: [
-      {
-        id: 'zju-read', name: 'ZJU Learning (Read)', description: 'Read ZJU course data without submission tools.',
-        providerName: 'zju-read-skills', platform: 'win32',
-        mcpServers: [mcp('zju-read-mcp', 'zju_learning', 'uv', ['run', '--project', './runtime', '--frozen', 'python', './scripts/start_mcp.py'], { cwd: '.', env: { ZJU_SUBMISSION_TOOLS: 'disabled' } })],
-        policy: policy('zju_learning', [
-          'mcp__zju_learning__zju_doctor', 'mcp__zju_learning__zju_auth_status', 'mcp__zju_learning__zju_list_terms',
-          'mcp__zju_learning__zju_list_courses', 'mcp__zju_learning__zju_get_course', 'mcp__zju_learning__zju_list_todos',
-          'mcp__zju_learning__zju_list_assignments', 'mcp__zju_learning__zju_get_assignment', 'mcp__zju_learning__zju_list_grades',
-        ]),
-        runtime: {
-          install: { command: 'uv', args: ['sync', '--project', './runtime', '--frozen'], cwd: '.' },
-        },
-        doctor: commonDoctor([{ label: 'uv', command: 'uv', args: ['--version'] }]),
-      },
-      {
-        id: 'zju-submit', name: 'ZJU Learning (Submit)', description: 'Prepare and submit one reviewed ordinary assignment with approval.',
-        providerName: 'zju-submit-skills', platform: 'win32',
-        mcpServers: [mcp('zju-submit-mcp', 'zju_learning', 'uv', ['run', '--project', './runtime', '--frozen', 'python', './scripts/start_mcp.py'], { cwd: '.', env: { ZJU_SUBMISSION_TOOLS: 'enabled' } })],
-        policy: policy('zju_learning', ['mcp__zju_learning__zju_doctor', 'mcp__zju_learning__zju_auth_status'], [
-          'mcp__zju_learning__zju_prepare_assignment_submission', 'mcp__zju_learning__zju_commit_assignment_submission',
-        ]),
-        runtime: {
-          install: { command: 'uv', args: ['sync', '--project', './runtime', '--frozen'], cwd: '.' },
-        },
-        doctor: commonDoctor([{ label: 'uv', command: 'uv', args: ['--version'] }]),
-      },
-    ],
   },
 ]
 
@@ -264,10 +180,6 @@ for (const item of packages) {
   const presetIds = (Array.isArray(item.preset) ? item.preset : [item.preset]).map(spec => spec.id)
   await prependReadme(directory, 'README.md', `# ${name}\n\n${item.description}.\n\nInstall into a DSH profile, then create the dedicated preset:\n\n\`\`\`sh\ndsh plugin --profile web add ${name}\ndsh plugin --profile web exec dsh-${item.slug} preset install\ndsh plugin --profile web exec dsh-${item.slug} doctor\n\`\`\`\n\nManaged preset id${presetIds.length === 1 ? '' : 's'}: ${presetIds.map(id => `\`${id}\``).join(', ')}. The standard preset does not receive this package's tools or skills. MCP writes and unknown tools require one-shot approval.\n\n${item.private ? '**Publication blocked:** this package remains private until its first-party license is resolved.\n' : ''}`)
   await prependReadme(directory, 'README.zh-CN.md', `# ${name}\n\n${item.description}。\n\n先安装到 DSH profile，再创建独立 Preset：\n\n\`\`\`powershell\ndsh plugin --profile web add ${name}\ndsh plugin --profile web exec dsh-${item.slug} preset install\ndsh plugin --profile web exec dsh-${item.slug} doctor\n\`\`\`\n\n受管 Preset：${presetIds.map(id => `\`${id}\``).join('、')}。标准 Preset 不会得到本包的工具或技能；MCP 写操作和未知工具必须经过一次性审批。\n\n${item.private ? '**禁止发布：**补齐作者代码许可证之前，本包保持 private。\n' : ''}`)
-}
-
-function fileURLToPath(url) {
-  return decodeURIComponent(url.pathname.replace(/^\/(?:[A-Za-z]:)/, value => value.slice(1))).replaceAll('/', '\\')
 }
 
 async function prependReadme(directory, name, header) {
