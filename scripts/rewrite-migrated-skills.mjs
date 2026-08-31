@@ -6,9 +6,6 @@ const roots = new URL('../plugins/', import.meta.url)
 const prefixRules = {
   'adobe-after-effects': [{ pattern: /\bae_[A-Za-z0-9_]+\b/g, server: 'after_effects' }],
   'adobe-photoshop': [{ pattern: /\bphotoshop_[A-Za-z0-9_]+\b/g, server: 'photoshop' }],
-  'calibre-library-tools': [{ pattern: /\bcalibre_[A-Za-z0-9_]+\b/g, server: 'calibre' }],
-  'zotero-mcp': [{ pattern: /\bzotero_[A-Za-z0-9_]+\b/g, server: 'zotero' }],
-  'zju-learning-tools': [{ pattern: /\bzju_[A-Za-z0-9_]+\b/g, server: 'zju_learning' }],
   'solidworks-automation': [{ pattern: /\bsolidworks_[A-Za-z0-9_]+\b/g, server: 'solidworks' }],
 }
 
@@ -20,6 +17,19 @@ const exactRules = {
   'autocad-mcp': {
     server: 'autocad',
     tools: ['drawing', 'entity', 'layer', 'block', 'annotation', 'pid', 'view', 'system'],
+  },
+  'comfy-local-tools': {
+    server: 'comfy_local',
+    tools: [
+      'server_info', 'system_stats', 'nodes', 'discover', 'search_models', 'search_templates',
+      'get_template', 'fetch_template', 'validate_workflow', 'job', 'get_logs', 'which',
+      'workflow_deps', 'node_dependencies', 'list_workflow_slots', 'generate_image',
+      'run_template', 'run_workflow', 'vary_workflow', 'fetch_outputs', 'upload_file',
+      'set_workflow_slot', 'launch_comfyui', 'restart_comfyui', 'stop_comfyui', 'free_memory',
+      'install_node', 'download_model', 'update_comfyui', 'switch_comfyui_version',
+      'partner_generate',
+    ],
+    inlineCodeOnly: true,
   },
   'renpy-visual-novel-dev': {
     server: 'renpy',
@@ -57,7 +67,11 @@ async function rewrite(file, pluginName) {
   const exact = exactRules[pluginName]
   if (exact !== undefined) {
     for (const tool of exact.tools) {
-      text = text.replace(new RegExp(`(?<!mcp__${exact.server}__)\\b${tool}\\b`, 'g'), `mcp__${exact.server}__${tool}`)
+      if (exact.inlineCodeOnly === true) {
+        text = text.replaceAll(`\`${tool}\``, `\`mcp__${exact.server}__${tool}\``)
+      } else {
+        text = text.replace(new RegExp(`(?<!mcp__${exact.server}__)\\b${tool}\\b`, 'g'), `mcp__${exact.server}__${tool}`)
+      }
     }
   }
   if (pluginName === 'renpy-visual-novel-dev') {

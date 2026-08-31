@@ -7,8 +7,15 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const PLUGINS = join(ROOT, 'plugins')
 const MIGRATED = [
   'adobe-after-effects', 'adobe-photoshop', 'adobe-premiere', 'autocad-mcp',
-  'calibre-library-tools', 'everything-search', 'latex-workflows', 'renpy-visual-novel-dev',
-  'solidworks-automation', 'zju-learning-tools', 'zotero-mcp',
+  'comfy-local-tools', 'renpy-visual-novel-dev', 'solidworks-automation',
+]
+const COMFY_TOOLS = [
+  'server_info', 'system_stats', 'nodes', 'discover', 'search_models', 'search_templates',
+  'get_template', 'fetch_template', 'validate_workflow', 'job', 'get_logs', 'which',
+  'workflow_deps', 'node_dependencies', 'list_workflow_slots', 'generate_image',
+  'run_template', 'run_workflow', 'vary_workflow', 'fetch_outputs', 'upload_file',
+  'set_workflow_slot', 'launch_comfyui', 'restart_comfyui', 'stop_comfyui', 'free_memory',
+  'install_node', 'download_model', 'update_comfyui', 'switch_comfyui_version', 'partner_generate',
 ]
 
 describe('migrated package contracts', () => {
@@ -47,9 +54,6 @@ describe('migrated package contracts', () => {
     const rawPatterns = [
       /(?<!mcp__after_effects__)\bae_[A-Za-z0-9_]+\b/u,
       /(?<!mcp__photoshop__)\bphotoshop_[A-Za-z0-9_]+\b/u,
-      /(?<!mcp__calibre__)\bcalibre_[A-Za-z0-9_]+\b/u,
-      /(?<!mcp__zotero__)\bzotero_[A-Za-z0-9_]+\b/u,
-      /(?<!mcp__zju_learning__)\bzju_[A-Za-z0-9_]+\b/u,
       /(?<!mcp__solidworks__)\bsolidworks_[A-Za-z0-9_]+\b/u,
     ]
     for (const directory of MIGRATED) {
@@ -60,6 +64,9 @@ describe('migrated package contracts', () => {
         if (path.endsWith('SKILL.md') && !text.includes('<!-- dsh-visual-fallback -->')) problems.push(path)
         if (/\$CODEX_HOME|CODEX_|computer-use|agents\/openai\.yaml|premiere:\/\//u.test(text)
           || rawPatterns.some(pattern => pattern.test(text))) problems.push(path)
+        if (directory === 'comfy-local-tools' && COMFY_TOOLS.some(tool => text.includes(`\`${tool}\``))) {
+          problems.push(path)
+        }
       })
     }
     expect(problems).toEqual([])
@@ -81,22 +88,25 @@ describe('migrated package contracts', () => {
     }
   })
 
-  it('enforces the Calibre, AutoCAD, RenPy, and ZJU special constraints', async () => {
-    const calibre = await preset('calibre-library-tools')
-    expect(calibre.mcpServers[0].env.CALIBRE_MCP_ENABLE_WRITE).toBe('0')
+  it('enforces the AutoCAD, Comfy, and RenPy special constraints', async () => {
     const autocad = await preset('autocad-mcp')
     expect(autocad.mcpServers[0].env.AUTOCAD_MCP_ONLY_TEXT).toBe('true')
+    const comfy = await preset('comfy-local-tools')
+    expect(comfy.mcpServers[0].serverName).toBe('comfy_local')
+    expect(comfy.mcpServers[0].toolCallTimeoutMs).toBe(900000)
+    expect(comfy.policy.ask).toEqual(expect.arrayContaining([
+      'mcp__comfy_local__partner_generate',
+      'mcp__comfy_local__install_node',
+      'mcp__comfy_local__download_model',
+    ]))
+    expect(JSON.stringify(comfy)).not.toContain('COMFY_API_KEY')
     const renpyStart = await readFile(join(PLUGINS, 'renpy-visual-novel-dev', 'scripts', 'start_renpy_mcp.py'), 'utf8')
     expect(renpyStart).not.toContain('CODEX_')
     expect(renpyStart).toContain('RENPY_PROJECT')
-    const zju = JSON.parse(await readFile(join(PLUGINS, 'zju-learning-tools', 'preset.json'), 'utf8')) as Array<Record<string, any>>
-    expect(zju.map(item => item.id)).toEqual(['zju-read', 'zju-submit'])
-    expect(zju[0]?.mcpServers[0].env.ZJU_SUBMISSION_TOOLS).toBe('disabled')
-    expect(zju[1]?.mcpServers[0].env.ZJU_SUBMISSION_TOOLS).toBe('enabled')
   })
 
   it('blocks publication where first-party licensing is unresolved', async () => {
-    for (const directory of ['adobe-after-effects', 'adobe-photoshop', 'adobe-premiere', 'autocad-mcp', 'latex-workflows']) {
+    for (const directory of ['adobe-after-effects', 'adobe-photoshop', 'adobe-premiere', 'autocad-mcp']) {
       const manifest = JSON.parse(await readFile(join(PLUGINS, directory, 'package.json'), 'utf8')) as { private?: boolean, license?: string }
       expect(manifest).toMatchObject({ private: true, license: 'UNLICENSED' })
     }
