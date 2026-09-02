@@ -29,7 +29,7 @@ export const INTEGRATIONS: readonly IntegrationDefinition[] = [
     command('photoshop', 'powershell.exe', [...POWERSHELL, '-File', './scripts/start-photoshop-mcp.ps1', '-Check'], false, 'Install and open Photoshop.', root, 'live'),
   ]),
   definition('premiere', 'adobe-premiere', 'Premiere Pro', 'win32', 'personal-only', root => [
-    command('node', 'node', ['--version'], true, 'Install Node.js 22.19 or newer.'),
+    versioned('node', 'node', ['--version'], '>=22.19.0', true, 'Install Node.js 22.19 or newer.'),
     pathProbe('premiere-cep', 'Premiere CEP bridge', 'bridge', join(process.env.APPDATA ?? '', 'Adobe', 'CEP', 'extensions', 'MCPBridgeCEP'), true, 'Run dsh-multi-tools runtime premiere install.'),
     notChecked('premiere-live', 'Premiere bridge connection', 'service', false, 'Start Premiere and the MCP Bridge CEP panel.', 'live'),
   ]),
@@ -52,7 +52,7 @@ export const INTEGRATIONS: readonly IntegrationDefinition[] = [
     notChecked('renpy-live', 'RenPy MCP handshake', 'service', false, 'Configure a project and SDK, then refresh live status.', 'live'),
   ]),
   definition('solidworks', 'solidworks-automation', 'SolidWorks', 'win32', 'publishable', root => [
-    command('python', 'python', ['--version'], true, 'Install Python 3.11 or newer.'),
+    versioned('python', 'python', ['--version'], '>=3.11.0', true, 'Install Python 3.11 or newer.'),
     command('solidworks-python', 'python', ['-c', 'import mcp,pydantic,pythoncom,comtypes; print("SolidWorks Python dependencies ready")'], true, 'Install mcp, pydantic, pywin32, and comtypes.', root),
     notChecked('solidworks-live', 'SolidWorks COM connection', 'service', false, 'Start SolidWorks before a live workflow.', 'live'),
   ]),

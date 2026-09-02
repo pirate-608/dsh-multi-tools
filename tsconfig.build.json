@@ -4,7 +4,8 @@
     "rootDir": ".",
     "outDir": "lib",
     "noEmit": false,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "experimentalDecorators": false
   },
   "include": [
     "src/**/*.ts",

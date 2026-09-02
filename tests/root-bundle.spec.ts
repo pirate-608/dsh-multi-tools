@@ -27,6 +27,14 @@ describe('aggregate bundle contracts', () => {
     expect(() => validateConfig({ ...config, modlens: { routes: { ollama: { type: 'ollama', baseUrl: 'https://remote.example', model: 'vision' } } } })).toThrow(/loopback/)
   })
 
+  it('reports malformed vision route URLs and fields as configuration errors', () => {
+    const config = Config({} as never)
+    expect(() => validateConfig({ ...config, modlens: { routes: { openai: { type: 'openai-compatible', baseUrl: '', model: 'vision' } } } })).toThrow(/baseUrl must be a non-empty string/)
+    expect(() => validateConfig({ ...config, modlens: { routes: { openai: { type: 'openai-compatible', baseUrl: 'not a url', model: 'vision' } } } })).toThrow(/baseUrl must be a valid URL/)
+    expect(() => validateConfig({ ...config, modlens: { routes: { openai: { type: 'openai-compatible', baseUrl: 'http://127.0.0.1:8080', model: '' } } } })).toThrow(/model must be a non-empty string/)
+    expect(() => validateConfig({ ...config, modlens: { routes: { ollama: { type: 'ollama', baseUrl: 'http://127.0.0.1:11434', model: 'vision' } }, failover: 'ollama' } } as never)).toThrow(/failover/)
+  })
+
   it('declares all eight optional integrations and personal redistribution boundaries', () => {
     expect(INTEGRATIONS.map(item => item.id)).toEqual(INTEGRATION_IDS)
     expect(INTEGRATIONS.filter(item => item.redistribution === 'personal-only').map(item => item.id))
