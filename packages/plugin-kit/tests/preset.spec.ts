@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { installPreset, presetStatus, removePreset, updatePreset } from '../src/preset.js'
+import { applyPresetSelection, installPreset, presetStatus, removePreset, updatePreset } from '../src/preset.js'
 import type { PresetContext, PresetSpec } from '../src/types.js'
 
 const roots: string[] = []
@@ -11,7 +11,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })))
 })
 
-async function fixture(): Promise<{ spec: PresetSpec, context: PresetContext }> {
+async function fixture(id = 'example'): Promise<{ spec: PresetSpec, context: PresetContext }> {
   const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-kit-'))
   roots.push(root)
   const standardPresetDir = join(root, 'dsh', 'standard')
@@ -22,10 +22,10 @@ async function fixture(): Promise<{ spec: PresetSpec, context: PresetContext }> 
   const spec: PresetSpec = {
     packageName: '@pirate-608/example',
     packageVersion: '1.0.0',
-    id: 'example',
+    id,
     name: 'Example',
     description: 'Example preset.',
-    providerName: 'example-skills',
+    providerName: `${id}-skills`,
     mcpServers: [{ id: 'example-mcp', serverName: 'example', command: 'node', args: ['server.js'] }],
     policy: {
       serverNames: ['example'],
@@ -71,5 +71,45 @@ describe('managed preset kit', () => {
     await expect(removePreset(spec, context)).rejects.toThrow(/--force/)
     const removed = await removePreset(spec, context, true)
     expect(removed.backupDir).toBeDefined()
+  })
+
+  it('applies a multi-preset selection only after preflight and persistence', async () => {
+    const first = await fixture('first')
+    const second = await fixture('second')
+    let persisted = false
+    const installed = await applyPresetSelection([first, second], ['first', 'second'], async () => { persisted = true })
+    expect(installed).toMatchObject({ enabled: ['first', 'second'], installed: ['first', 'second'], removed: [] })
+    expect(persisted).toBe(true)
+    const narrowed = await applyPresetSelection([first, second], ['second'], async () => undefined)
+    expect(narrowed).toMatchObject({ enabled: ['second'], installed: [], removed: ['first'] })
+    await expect(presetStatus(first.spec, first.context)).resolves.toMatchObject({ kind: 'absent' })
+    await expect(presetStatus(second.spec, second.context)).resolves.toMatchObject({ kind: 'clean' })
+  })
+
+  it('rolls back filesystem changes when persistence fails', async () => {
+    const first = await fixture('first')
+    const second = await fixture('second')
+    await installPreset(first.spec, first.context)
+    await expect(applyPresetSelection([first, second], ['second'], async () => { throw new Error('persist failed') }))
+      .rejects.toThrow('persist failed')
+    await expect(presetStatus(first.spec, first.context)).resolves.toMatchObject({ kind: 'clean' })
+    await expect(presetStatus(second.spec, second.context)).resolves.toMatchObject({ kind: 'absent' })
+  })
+
+  it('refuses an entire selection before touching a modified removal', async () => {
+    const first = await fixture('first')
+    const second = await fixture('second')
+    const installed = await installPreset(first.spec, first.context)
+    await writeFile(join(installed.presetDir, 'mine.txt'), 'mine')
+    await expect(applyPresetSelection([first, second], ['second'], async () => undefined)).rejects.toThrow(/blocked/)
+    await expect(presetStatus(first.spec, first.context)).resolves.toMatchObject({ kind: 'modified' })
+    await expect(presetStatus(second.spec, second.context)).resolves.toMatchObject({ kind: 'absent' })
+  })
+
+  it('can inspect unsupported presets but refuses to enable them', async () => {
+    const item = await fixture('foreign')
+    item.spec.platform = process.platform === 'win32' ? 'linux' : 'win32'
+    await expect(presetStatus(item.spec, item.context)).resolves.toMatchObject({ kind: 'absent' })
+    await expect(applyPresetSelection([item], ['foreign'], async () => undefined)).rejects.toThrow(/requires/)
   })
 })

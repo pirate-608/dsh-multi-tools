@@ -8,7 +8,9 @@ if (!['0.0.1-rc.5', '0.1.0-rc.6', '0.1.0-rc.8'].includes(requested)) {
   throw new Error('usage: node scripts/select-dsh-version.mjs <0.0.1-rc.5|0.1.0-rc.6|0.1.0-rc.8>')
 }
 
-const roots = ['.']
+// The aggregate root targets alpha.3+ and retains those API dependencies;
+// compatibility jobs rewrite only independently published leaf units.
+const roots = ['packages', 'plugins']
 for (const root of roots) await visit(root)
 
 async function visit(directory) {

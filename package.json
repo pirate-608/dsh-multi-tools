@@ -1,19 +1,90 @@
 {
-  "name": "pirate-608-dsh-multi-tools",
-  "version": "0.0.0",
+  "name": "@pirate-608/dsh-multi-tools",
+  "version": "0.1.0",
+  "description": "Private multimodal integration suite for DeepSeek Harness",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
+  "main": "./lib/src/index.js",
+  "types": "./lib/src/index.d.ts",
+  "bin": {
+    "dsh-multi-tools": "./lib/src/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/src/index.d.ts",
+      "default": "./lib/src/index.js"
+    },
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/**/*.js",
+    "lib/**/*.d.ts",
+    "dist/integrations/**",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE",
+    "NOTICE.md",
+    "SYNC_SOURCES.json"
+  ],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  },
   "packageManager": "pnpm@10.14.0",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
   "scripts": {
-    "build": "pnpm --filter @pirate-608/dsh-plugin-kit build && pnpm -r build",
-    "typecheck": "pnpm --filter @pirate-608/dsh-plugin-kit build && pnpm -r typecheck",
-    "test": "pnpm --filter @pirate-608/dsh-plugin-kit build && pnpm -r test",
-    "check": "pnpm run typecheck && pnpm run test && pnpm run build"
+    "build:root": "tsc -p tsconfig.build.json && node scripts/build-root-client.mjs && node scripts/build-aggregate-payloads.mjs",
+    "build": "pnpm --filter @pirate-608/dsh-plugin-kit build && pnpm run build:root && pnpm -r build",
+    "typecheck": "tsc -p tsconfig.json --noEmit && pnpm -r typecheck",
+    "test": "vitest run --config vitest.config.ts && pnpm -r test",
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build",
+    "check:root": "tsc -p tsconfig.json --noEmit && vitest run --config vitest.config.ts && pnpm --filter @pirate-608/dsh-plugin-kit test && pnpm run build:root && node scripts/smoke-built-root.mjs",
+    "check:legacy": "pnpm --filter @pirate-608/dsh-plugin-kit build && pnpm --filter @pirate-608/dsh-plugin-kit test && pnpm --filter @pirate-608/dsh-migration-tests test && pnpm --workspace-concurrency=2 --filter \"./plugins/*\" typecheck && pnpm --workspace-concurrency=2 --filter \"./plugins/*\" test && pnpm --workspace-concurrency=2 --filter \"./plugins/*\" build",
+    "prepare": "pnpm run build:root",
+    "prepack": "pnpm run check"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.2 <5.0.0",
+    "@deepseek-ai/dsh": ">=0.1.2-alpha.3 <0.2.0",
+    "@deepseek-ai/dsh-home-paths": ">=0.1.2-alpha.3 <0.2.0",
+    "@deepseek-ai/dsh-settings": ">=0.1.2-alpha.3 <0.2.0",
+    "@deepseek-ai/dsh-typert-protocol": ">=0.1.2-alpha.3 <0.2.0",
+    "@deepseek-ai/schemastery": ">=3.18.2 <4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": { "optional": true },
+    "@deepseek-ai/dsh": { "optional": true },
+    "@deepseek-ai/dsh-home-paths": { "optional": true },
+    "@deepseek-ai/dsh-settings": { "optional": true },
+    "@deepseek-ai/dsh-typert-protocol": { "optional": true },
+    "@deepseek-ai/schemastery": { "optional": true }
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh": "0.1.0-rc.8"
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-home-paths": "0.1.2-alpha.3",
+    "@deepseek-ai/dsh-settings": "0.1.2-alpha.3",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.2-alpha.3",
+    "@deepseek-ai/schemastery": "^3.18.2",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.4"
   }
 }

@@ -1,0 +1,4 @@
+- insert:
+    - id: pirate-dsh-multi-tools
+      name: '@pirate-608/dsh-multi-tools'
+      config: {}

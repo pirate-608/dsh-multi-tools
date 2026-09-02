@@ -75,3 +75,102 @@ export interface PresetWriteResult {
   presetDir: string
   backupDir?: string
 }
+
+/** Stable ids managed by the aggregate multi-tools bundle. */
+export type IntegrationId =
+  | 'after-effects'
+  | 'photoshop'
+  | 'premiere'
+  | 'autocad'
+  | 'comfy-local'
+  | 'renpy'
+  | 'solidworks'
+  | 'unity'
+
+/** ModLens is an always-on core target; the remaining ids are optional presets. */
+export type IntegrationTargetId = 'modlens' | IntegrationId
+
+/** Installed probes are passive; live probes may contact local services. */
+export type ProbeMode = 'installed' | 'live'
+
+/** One dependency category shown by the CLI and Web UI. */
+export type DependencyKind =
+  | 'command'
+  | 'package'
+  | 'desktop-app'
+  | 'service'
+  | 'bridge'
+  | 'project'
+  | 'sdk'
+  | 'credential'
+  | 'model'
+
+/** Normalized dependency result shared by every integration. */
+export interface DependencyStatus {
+  id: string
+  label: string
+  kind: DependencyKind
+  required: boolean
+  state:
+    | 'ready'
+    | 'missing'
+    | 'unconfigured'
+    | 'stopped'
+    | 'unreachable'
+    | 'version-mismatch'
+    | 'unsupported'
+    | 'not-checked'
+    | 'error'
+  detectedVersion?: string
+  requiredVersion?: string
+  summary: string
+  remediation?: { kind: 'command' | 'manual', text: string }
+}
+
+/** One integration's preset, runtime, and live-service state. */
+export interface IntegrationStatus {
+  id: IntegrationTargetId
+  configuredEnabled: boolean
+  effectiveEnabled: boolean
+  availability: 'available' | 'unsupported-platform'
+  preset: 'not-applicable' | PresetStatus['kind']
+  runtime: DependencyStatus[]
+  live: DependencyStatus[]
+  overall: 'ready' | 'needs-setup' | 'blocked' | 'not-checked'
+  redistribution: 'publishable' | 'personal-only'
+}
+
+/** Versioned, JSON-safe snapshot returned by the root CLI and Remote. */
+export interface MultiToolsStatusSnapshot {
+  formatVersion: 1
+  revision: string
+  mode: ProbeMode
+  checkedAt: string
+  integrations: IntegrationStatus[]
+}
+
+/** One bounded, side-effect-classified dependency probe. */
+export interface DependencyProbe {
+  id: string
+  label: string
+  kind: DependencyKind
+  required: boolean
+  mode: ProbeMode
+  timeoutMs?: number
+  requiredVersion?: string
+  remediation?: DependencyStatus['remediation']
+  run(signal: AbortSignal): Promise<Omit<DependencyStatus, 'id' | 'label' | 'kind' | 'required' | 'requiredVersion' | 'remediation'>>
+}
+
+/** Input for one atomic managed-preset selection transaction. */
+export interface PresetSelectionItem {
+  spec: PresetSpec
+  context: PresetContext
+}
+
+/** Result of one committed managed-preset selection transaction. */
+export interface PresetSelectionResult {
+  enabled: string[]
+  installed: string[]
+  removed: string[]
+}

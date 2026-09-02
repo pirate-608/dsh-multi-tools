@@ -1,6 +1,7 @@
 /** Shared CLI and DSH profile resolution for managed plugin presets. */
 
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
@@ -27,11 +28,20 @@ export async function resolvePresetContext(
   const dshManifest = JSON.parse(await readFile(dshManifestPath, 'utf8')) as { version?: string }
   if (typeof dshManifest.version !== 'string') throw new Error(`Invalid DSH manifest at ${dshManifestPath}`)
   const requireFromDsh = createRequire(dshManifestPath)
+  const legacyStandard = join(dirname(dshManifestPath), 'config', 'agent-presets', 'standard')
+  let standardPresetDir = legacyStandard
+  try {
+    const presetManifest = requireFromDsh.resolve('@deepseek-ai/dsh-agent-presets/package.json')
+    const packagedStandard = join(dirname(presetManifest), 'presets', 'standard')
+    if (existsSync(packagedStandard)) standardPresetDir = packagedStandard
+  } catch {
+    // rc.5/rc.6 carry the shipped tree under @deepseek-ai/dsh itself.
+  }
   return {
     dshHome,
     profileName,
     profileDir,
-    standardPresetDir: join(dirname(dshManifestPath), 'config', 'agent-presets', 'standard'),
+    standardPresetDir,
     packageRoot: resolve(packageRoot),
     mcpClientPlugin: requireFromDsh.resolve('@deepseek-ai/dsh-mcp-client'),
     skillFilesystemPlugin: requireFromDsh.resolve('@deepseek-ai/dsh-skill-filesystem'),
