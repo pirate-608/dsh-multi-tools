@@ -3,7 +3,14 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { chmod, cp, lstat, mkdir, readFile, readdir, readlink, rename, rm, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
-import type { PresetContext, PresetSpec, PresetStatus, PresetWriteResult } from './types.js'
+import type {
+  PresetContext,
+  PresetSelectionItem,
+  PresetSelectionResult,
+  PresetSpec,
+  PresetStatus,
+  PresetWriteResult,
+} from './types.js'
 
 const STATE_FILE = '.dsh-plugin-kit.json'
 const COMPOSITION_FILE = 'agent.cordis.yml'
@@ -96,9 +103,94 @@ export async function removePreset(
   return { removed: true }
 }
 
+/**
+ * Apply one all-or-nothing preset selection and persist its configuration only
+ * after every filesystem rename succeeds.
+ *
+ * Existing enabled presets are left byte-for-byte intact, including outdated
+ * or locally modified ones. Disabling a modified or unowned directory fails
+ * during preflight before any path moves.
+ */
+export async function applyPresetSelection(
+  items: readonly PresetSelectionItem[],
+  enabledIds: readonly string[],
+  persist: () => Promise<void>,
+): Promise<PresetSelectionResult> {
+  const byId = new Map<string, PresetSelectionItem>()
+  for (const item of items) {
+    if (byId.has(item.spec.id)) throw new Error(`Duplicate preset selection id "${item.spec.id}"`)
+    validate(item.spec, item.context, false)
+    byId.set(item.spec.id, item)
+  }
+  const enabled = new Set<string>()
+  for (const id of enabledIds) {
+    if (!byId.has(id)) throw new Error(`Unknown preset selection id "${id}"`)
+    if (enabled.has(id)) throw new Error(`Duplicate enabled preset id "${id}"`)
+    enabled.add(id)
+  }
+  for (const id of enabled) {
+    const spec = (byId.get(id) as PresetSelectionItem).spec
+    if (spec.platform !== undefined && spec.platform !== process.platform) {
+      throw new Error(`Preset "${id}" requires ${spec.platform}; current platform is ${process.platform}`)
+    }
+  }
+
+  const statuses = new Map<string, PresetStatus>()
+  for (const [id, item] of byId) statuses.set(id, await presetStatus(item.spec, item.context))
+  const blockers: string[] = []
+  for (const [id, status] of statuses) {
+    if (enabled.has(id) || status.kind === 'absent') continue
+    if (status.kind === 'modified' || status.kind === 'invalid') blockers.push(`${id}: ${status.message}`)
+  }
+  if (blockers.length > 0) throw new Error(`Preset selection is blocked:\n${blockers.join('\n')}`)
+
+  const installs = [...byId.entries()].filter(([id]) => enabled.has(id) && statuses.get(id)?.kind === 'absent')
+  const removals = [...byId.entries()].filter(([id]) => !enabled.has(id) && statuses.get(id)?.kind !== 'absent')
+  const prepared = new Map<string, string>()
+  const staged = new Map<string, string>()
+  const committedInstalls: string[] = []
+  try {
+    for (const [id, item] of installs) prepared.set(id, await generatePreset(item.spec, item.context))
+    for (const [id, item] of removals) {
+      const target = presetDir(item.context, item.spec.id)
+      const stage = `${target}.selection-${process.pid}-${randomUUID()}`
+      await rename(target, stage)
+      staged.set(id, stage)
+    }
+    for (const [id, item] of installs) {
+      const temp = prepared.get(id) as string
+      await rename(temp, presetDir(item.context, item.spec.id))
+      prepared.delete(id)
+      committedInstalls.push(id)
+    }
+    await persist()
+  } catch (error) {
+    for (const id of committedInstalls.reverse()) {
+      const item = byId.get(id) as PresetSelectionItem
+      await rm(presetDir(item.context, item.spec.id), { recursive: true, force: true })
+    }
+    for (const [id, stage] of [...staged.entries()].reverse()) {
+      const item = byId.get(id) as PresetSelectionItem
+      await rename(stage, presetDir(item.context, item.spec.id))
+      staged.delete(id)
+    }
+    for (const temp of prepared.values()) await rm(temp, { recursive: true, force: true })
+    throw error
+  }
+
+  // Staged removals use invalid preset ids and are therefore invisible even
+  // if a platform-specific cleanup failure leaves one behind.
+  await Promise.allSettled([...staged.values()].map(stage => rm(stage, { recursive: true, force: true })))
+  return {
+    enabled: [...enabled].sort(),
+    installed: installs.map(([id]) => id).sort(),
+    removed: removals.map(([id]) => id).sort(),
+  }
+}
+
 /** Inspect ownership, local changes, host drift, and specification drift. */
 export async function presetStatus(spec: PresetSpec, context: PresetContext): Promise<PresetStatus> {
-  validate(spec, context)
+  validate(spec, context, false)
   const target = presetDir(context, spec.id)
   if (!await pathExists(target)) {
     return { kind: 'absent', presetDir: target, message: `Preset "${spec.id}" is not installed` }
@@ -203,10 +295,10 @@ function assertRowsAvailable(composition: string, ids: readonly string[]): void 
   }
 }
 
-function validate(spec: PresetSpec, context: PresetContext): void {
+function validate(spec: PresetSpec, context: PresetContext, requirePlatform = true): void {
   if (!ID_PATTERN.test(spec.id)) throw new Error(`Preset id must match ${ID_PATTERN.source}`)
   if (!ID_PATTERN.test(spec.providerName)) throw new Error(`Provider name must match ${ID_PATTERN.source}`)
-  if (spec.platform !== undefined && spec.platform !== process.platform) {
+  if (requirePlatform && spec.platform !== undefined && spec.platform !== process.platform) {
     throw new Error(`Preset "${spec.id}" requires ${spec.platform}; current platform is ${process.platform}`)
   }
   for (const server of spec.mcpServers ?? []) {

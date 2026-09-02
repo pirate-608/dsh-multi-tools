@@ -13,6 +13,7 @@ interface ContextLike {
   fs: Parameters<typeof loadImage>[0]['fs']
   attachments: Parameters<typeof loadImage>[0]['attachments']
   credentials?: { resolve(ref: string): Promise<{ value: string } | undefined> }
+  get?(name: string): unknown
   llm?: {
     listProviders(): readonly { id?: string }[]
     listModels(provider: string): Promise<readonly { id?: string, name?: string, inputModalities?: readonly string[] }[]>
@@ -40,7 +41,7 @@ export const inject = ['tools', 'fs', 'attachments']
 /** Register the logged vision tool and the conservative Web paste bridge. */
 export function apply(ctx: ContextLike, config: Config = {}): void {
   validateConfig(config)
-  const maxBytes = config.maxImageBytes ?? 25 * 1024 * 1024
+  const maxBytes = (): number => config.maxImageBytes ?? 25 * 1024 * 1024
   ctx.tools.register({
     name: 'modlens_read_image',
     description: 'Read one image through a text-first vision bridge. Use for a local path, an authorized session attachment, a private modlens paste reference, or an http(s) URL. Returns structured OCR, layout, semantics, visual evidence, uncertainty, provider provenance, and failover attempts.',
@@ -79,13 +80,16 @@ export function apply(ctx: ContextLike, config: Config = {}): void {
         ctx,
         args,
         exec.agent === undefined ? { signal: exec.signal } : { signal: exec.signal, agent: exec.agent },
-        maxBytes,
+        maxBytes(),
       )
+      const credentials = typeof ctx.get === 'function'
+        ? ctx.get('credentials') as ContextLike['credentials']
+        : ctx.credentials
       return analyze(config, image, {
         ...(args.prompt === undefined ? {} : { prompt: args.prompt }),
         ...(args.route === undefined ? {} : { route: args.route }),
         signal: exec.signal,
-        ...(ctx.credentials === undefined ? {} : { credentials: ctx.credentials }),
+        ...(credentials === undefined ? {} : { credentials }),
       })
     },
   })
@@ -113,7 +117,7 @@ function validateConfig(config: Config): void {
   if (config.routes?.ollama !== undefined && config.routes.ollama.type !== 'ollama') throw new Error('routes.ollama.type must be ollama')
 }
 
-function registerPasteRoute(scope: ContextLike & { webServer: WebServerLike }, host: ContextLike, maxBytes: number): void {
+function registerPasteRoute(scope: ContextLike & { webServer: WebServerLike }, host: ContextLike, maxBytes: () => number): void {
   scope.webServer.register({
     name: 'pirate-modlens-paste', kind: 'exact', path: '/modlens/paste',
     handler: async (req, res) => {
@@ -126,12 +130,13 @@ function registerPasteRoute(scope: ContextLike & { webServer: WebServerLike }, h
       try {
         const chunks: Buffer[] = []
         let total = 0
+        const limit = maxBytes()
         for await (const chunk of req) {
           total += chunk.length
-          if (total > maxBytes) { res.writeHead(413).end(JSON.stringify({ error: `image exceeds ${maxBytes} bytes` })); req.destroy(); return }
+          if (total > limit) { res.writeHead(413).end(JSON.stringify({ error: `image exceeds ${limit} bytes` })); req.destroy(); return }
           chunks.push(Buffer.from(chunk))
         }
-        const path = await savePaste(new Uint8Array(Buffer.concat(chunks)), maxBytes)
+        const path = await savePaste(new Uint8Array(Buffer.concat(chunks)), limit)
         res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ path }))
       } catch (error) {
         res.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }))
