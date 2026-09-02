@@ -5,6 +5,7 @@
     "outDir": "lib",
     "noEmit": false,
     "resolveJsonModule": true,
+    // Typert uses TypeScript's standard decorators; keep legacy decorator lowering disabled.
     "experimentalDecorators": false
   },
   "include": [
