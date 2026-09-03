@@ -6,15 +6,22 @@
 
 ## 安装
 
+安装聚合包前，先从目标 profile 移除 `@liustack/modlens` 或 `@pirate-608/dsh-modlens`。这两个独立包都会注册 `modlens_read_image`，因此聚合包会拒绝与任意一个同时启动。
+
 ```powershell
 dsh plugin --profile web add github:pirate-608/dsh-multi-tools
 ```
 
-Git 依赖会在 pnpm 安装阶段构建 Host 与浏览器 bundle。若 pnpm 阻止本包的 `prepare`，请按错误信息把精确包名加入 Web profile 的 `pnpm-workspace.yaml` `allowBuilds`，再重试命令。本包没有 `postinstall`，不会自动安装 MCP、下载模型或启动桌面应用。
+Git 依赖会在 pnpm 安装阶段构建 Host 与浏览器 bundle。第一次 `add` 可能以 `ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED` 停止；这是 pnpm 在请求允许仓库的 `prepare` 脚本于 agent 沙箱外执行。请把错误中打印的精确包键复制到 `C:\Users\<user>\.dsh\profiles\web\pnpm-workspace.yaml`，用引号包住键，再重复原命令：
+
+```yaml
+allowBuilds:
+  '<pnpm 打印的精确包键>': true
+```
+
+只应授权已经审查的 commit。测试评审版本时，请安装固定引用，例如 `github:pirate-608/dsh-multi-tools#<完整-commit-sha>`，并放行该 commit 对应错误中打印的 archive 键。本包没有 `postinstall`，不会自动安装 MCP、下载模型或启动桌面应用。
 
 重启 Web profile 后打开 **设置 → 插件 → Multi Tools**。ModLens 始终存在但默认没有视觉路线；其余集成默认关闭，启用后只为新会话创建对应的独立受管 Preset。
-
-安装聚合包前请先移除独立的 `@pirate-608/dsh-modlens` bundle；两个包都会注册 `modlens_read_image`，因此会明确拒绝重复挂载。
 
 ## 多模态工作流
 

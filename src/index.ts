@@ -20,7 +20,7 @@ export async function apply(ctx: Context, entryConfig: MultiToolsConfig): Promis
   const modlensConfig = structuredClone(scope.get().modlens)
   const existingModLens = (ctx as unknown as { tools: { get?(name: string): unknown } }).tools.get?.('modlens_read_image')
   if (existingModLens !== undefined) {
-    throw new Error('dsh-multi-tools: modlens_read_image is already registered; remove the standalone dsh-modlens bundle before enabling this aggregate')
+    throw new Error('dsh-multi-tools: modlens_read_image is already registered; remove @liustack/modlens or @pirate-608/dsh-modlens from this profile before enabling the aggregate')
   }
   applyModLens(ctx as never, modlensConfig)
   scope.watch(next => {

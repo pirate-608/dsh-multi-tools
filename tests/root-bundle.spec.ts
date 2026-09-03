@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { Config, INTEGRATION_IDS, validateConfig } from '../src/config.js'
+import apply from '../src/index.js'
 import { INTEGRATIONS } from '../src/integrations.js'
 
 describe('aggregate bundle contracts', () => {
@@ -16,6 +17,15 @@ describe('aggregate bundle contracts', () => {
     })
     expect(manifest.scripts.postinstall).toBeUndefined()
     expect(manifest.peerDependencies['@deepseek-ai/dsh']).toBe('>=0.1.2-alpha.3 <0.2.0')
+  })
+
+  it('identifies either standalone ModLens package when tool registration conflicts', async () => {
+    const config = Config({} as never)
+    const ctx = {
+      settings: { register: () => ({ get: () => config }) },
+      tools: { get: () => ({}) },
+    }
+    await expect(apply(ctx as never, config)).rejects.toThrow(/@liustack\/modlens.*@pirate-608\/dsh-modlens/u)
   })
 
   it('defaults to ModLens-only operation and validates duplicate selections', () => {
